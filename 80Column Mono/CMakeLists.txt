@@ -12,6 +12,7 @@ project(picoterm VERSION 1.0.0)
 add_executable(picoterm
                main.c
                picoterm.c
+               serial.c
                #font6.c
                font8.c
                #font10.c

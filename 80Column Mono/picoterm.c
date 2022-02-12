@@ -6,6 +6,8 @@
  * main.c handles the ins and outs
  * picoterm.c handles the behaviour of the terminal and storing the text
  *
+ * 11/feb/22: Code cleaning and bug fixing by Daniel Quadros, 
+ *            https:dqsoft.blogspot.com
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -426,7 +428,7 @@ void prepare_text_buffer(){
 
     reset_escape_sequence();
 
-    for(int c=0;c<=ROWS;c++){
+    for(int c=0;c<ROWS;c++){    // !!!
         struct row_of_text *newRow;
         /* Create structure in memory */
         newRow=(struct row_of_text *)malloc(sizeof(struct row_of_text));
@@ -458,13 +460,10 @@ print_string("_/_/      _/_/ _/_/      _/_/ _/_/      _/_/ _/_/_/    _/_/   _/_/
 print_string("_/_/      _/_/   _/_/_/_/_/   _/_/_/_/_/_/_/   _/_/_/_/_/ _/_/_/_/_/_/     _/_/\r\n");
 print_string("_/_/      _/_/   _/_/_/_/_/   _/_/_/_/_/_/_/   _/_/_/_/_/ _/_/_/_/_/_/     _/_/\r\n");
 
-    print_string("\r\n\r\nPicoTerm 0.1.2  S. Dixon\r\n");
-
-
+    print_string("\r\n\r\nPicoTerm 0.2.0  S. Dixon & DQ\r\n");
 
     // print cursor
     make_cursor_visible(true);
-    clear_cursor();  // so we have the character
     print_cursor();  // turns on
 }
 
