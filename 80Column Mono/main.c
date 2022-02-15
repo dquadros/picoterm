@@ -2,7 +2,7 @@
  * Terminal software for Pi Pico
  * USB keyboard input, VGA video output, communication with RC2014 via UART on GPIO 20 & 21
  * Shiela Dixon, https://peacockmedia.software  
- * Refactored on feb/22 by Daniel Quadros, https:dqsoft.blogspot.com
+ * Refactored on feb/22 by Daniel Quadros, https://dqsoft.blogspot.com
  *
  *
  * much of what's in this main file is taken from the VGA textmode example
@@ -30,7 +30,6 @@
 
 // LED control
 enum { LED_ON, LED_OFF, LED_BLINK } led_status;
-bool led_state = false;
 
 // Video mode
 #define vga_mode vga_mode_640x480_60
@@ -78,7 +77,7 @@ struct mutex frame_logic_mutex;
 void go_core1(void (*execute)());
 void init_render_state(int core);
 
-// "Task" (rotines that will be continuous called in the main loop)
+// "Tasks" (rotines that will be continuous called in the main loop)
 void led_blinking_task(void);
 void cdc_task(void);
 void hid_app_task(void);
@@ -320,7 +319,7 @@ void handle_rx() {
     do {
         handle_new_character(get_rx());
     } while (has_rx());
-    print_cursor();
+    show_cursor();
   }
 }
 
@@ -382,7 +381,7 @@ CFG_TUSB_MEM_SECTION static char serial_in_buffer[64] = { 0 };
 void tuh_mount_cb(uint8_t dev_addr)
 {
   // application set-up
-  printf("A device with address %d is mounted\r\n", dev_addr);
+  //printf("A device with address %d is mounted\r\n", dev_addr);
   led_status = LED_OFF;
   tuh_cdc_receive(dev_addr, serial_in_buffer, sizeof(serial_in_buffer), true); // schedule first transfer
 }
@@ -390,7 +389,7 @@ void tuh_mount_cb(uint8_t dev_addr)
 void tuh_umount_cb(uint8_t dev_addr)
 {
   // application tear-down
-  printf("A device with address %d is unmounted \r\n", dev_addr);
+  //printf("A device with address %d is unmounted \r\n", dev_addr);
   led_status = LED_BLINK;
 }
 
@@ -401,7 +400,7 @@ void tuh_cdc_xfer_isr(uint8_t dev_addr, xfer_result_t event, cdc_pipeid_t pipe_i
   (void) pipe_id;
   (void) xferred_bytes;
 
-  printf(serial_in_buffer);
+  //printf(serial_in_buffer);
   tu_memclr(serial_in_buffer, sizeof(serial_in_buffer));
 
   tuh_cdc_receive(dev_addr, serial_in_buffer, sizeof(serial_in_buffer), true); // waiting for next data
@@ -423,14 +422,21 @@ void led_blinking_task(void)
 {
   const uint32_t interval_ms = 1000;
   static uint32_t start_ms = 0;
+  static bool led_state = false;
 
 
   switch(led_status){
     case LED_OFF:
-     board_led_write(false);
+      if (led_state) {
+        board_led_write(false);
+        led_state = false;
+      }
      break;
     case LED_ON:
-     board_led_write(true);
+      if (!led_state) {
+        board_led_write(true);
+        led_state = true;
+      }
      break;
     case LED_BLINK:
       // Blink every interval ms
@@ -490,7 +496,10 @@ void hid_app_task(void)
 // can be used to parse common/simple enough descriptor.
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len)
 {
-  printf("HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
+  //char msg[200];
+  //printf("HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
+  //sprintf(msg, "HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
+  //print_string(msg);
 
   // Interface protocol
   const char* protocol_str[] = { "None", "Keyboard", "Mouse" }; // hid_protocol_type_t
@@ -498,13 +507,15 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 
   // Parse report descriptor with built-in parser
   _report_count[instance] = tuh_hid_parse_report_descriptor(_report_info_arr[instance], MAX_REPORT, desc_report, desc_len);
-  printf("HID has %u reports and interface protocol = %s\r\n", _report_count[instance], protocol_str[interface_protocol]);
+  //printf("HID has %u reports and interface protocol = %s\r\n", _report_count[instance], protocol_str[interface_protocol]);
+  //sprintf(msg, "HID has %u reports and interface protocol = %s\r\n", _report_count[instance], protocol_str[interface_protocol]);
+  //print_string(msg);
 }
 
 // Invoked when device with hid interface is un-mounted
 void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
 {
-  printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
+  //printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
 }
 
 // Invoked when received report from device via interrupt endpoint
@@ -541,7 +552,7 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
 
   if (!rpt_info)
   {
-    printf("Couldn't find the report info for this report !\r\n");
+    //printf("Couldn't find the report info for this report !\r\n");
     return;
   }
 
@@ -617,18 +628,25 @@ static void process_kbd_report(hid_keyboard_report_t const *report)
         bool const is_ctrl =  report->modifier & (KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_RIGHTCTRL);
         bool const is_shift =  report->modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT);
         uint8_t ch = keycode2ascii[report->keycode[i]][is_shift ? 1 : 0];
+
+        //char msg[100];
+        //sprintf(msg, "key=%c(%02X) ", ch, ch);
+        //print_string(msg);
         
         if(report->keycode[i]!=HID_KEY_CAPS_LOCK){
           if(is_ctrl && ch>95){
             put_tx(ch-96);
+            //put_rx(ch-96);
             //uart_putc (UART_ID, ch-96);
           }
           else if(capslock_on && ch>96 && ch<123){
             put_tx(ch-32);
+            //put_rx(ch-32);
             //uart_putc (UART_ID, ch-32);
           } 
           else{
             put_tx(ch);
+            //put_rx(ch);
             //uart_putc (UART_ID, ch);
           }
         }

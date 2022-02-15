@@ -4,7 +4,7 @@
  * Shiela Dixon, https://peacockmedia.software  
  *
  * This module handles the UART
- * Written on feb/22 by Daniel Quadros, https:dqsoft.blogspot.com
+ * Written on feb/22 by Daniel Quadros, https://dqsoft.blogspot.com
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -53,7 +53,7 @@ static void on_uart_rx();
 //--------------------------------------------------------------------+
 
 // Put received char in the buffer
-static inline void put_rx(uint8_t ch) {
+inline void put_rx(uint8_t ch) {
     buffer_rx[buf_rx_in] = ch;
     int aux = buf_rx_in+1;
     if (aux >= RX_BUFFER_SIZE) {
@@ -79,6 +79,7 @@ uint8_t get_rx() {
             aux = 0;
         }
         buf_rx_out = aux;
+        return ch;
     } else {
         return 0;   // buffer empty
     }
@@ -115,6 +116,7 @@ static uint8_t get_tx() {
             aux = 0;
         }
         buf_tx_out = aux;
+        return ch;
     } else {
         return 0;   // buffer empty
     }
@@ -124,6 +126,9 @@ static uint8_t get_tx() {
 // UART routines
 //--------------------------------------------------------------------+
 void serial_init() {
+
+    buf_rx_in = buf_rx_out = 0;
+    buf_tx_in = buf_tx_out = 0;
 
     uart_init(UART_ID, BAUD_RATE);
     uart_set_hw_flow(UART_ID,false,false);

@@ -20,6 +20,7 @@
 #define _SERIAL_H
 
 bool has_rx(void);
+void put_rx(uint8_t ch);
 uint8_t get_rx(void);
 void put_tx(uint8_t ch);
 void serial_init(void);

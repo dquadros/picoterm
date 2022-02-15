@@ -6,8 +6,8 @@
  * main.c handles the ins and outs
  * picoterm.c handles the behaviour of the terminal and storing the text
  *
- * 11/feb/22: Code cleaning and bug fixing by Daniel Quadros, 
- *            https:dqsoft.blogspot.com
+ * feb/22: Code cleaning and bug fixing by Daniel Quadros, 
+ *         https://dqsoft.blogspot.com
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -48,10 +48,10 @@ static bool parameter_q;
 static int esc_parameter_count;
 static unsigned char esc_c1;
 static unsigned char esc_final_byte;
+static bool rvs = false;
 
 bool cursor_visible;
-static bool rvs = false;
-static unsigned char chr_under_csr;
+static unsigned char chr_under_csr = 0xFF;
 
 void make_cursor_visible(bool v){
     cursor_visible=v;
@@ -102,11 +102,15 @@ void constrain_cursor_values(){
     if(csr.y>=VISIBLEROWS) csr.y=VISIBLEROWS-1;    
 }
 
-
+// Put char in the screen memory, taking in account the reverse flag
 void slip_character(unsigned char ch,int x,int y){
     if(rvs && ch<95){   // 95 is the start of the rvs character set
         ch = ch + 95;
     }
+    ptr[y]->slot[x] = ch;
+}
+
+void store_character(unsigned char ch,int x,int y){
     ptr[y]->slot[x] = ch;
 }
 
@@ -137,10 +141,17 @@ void shuffle(){
     }
 }
 
-void print_cursor(){
+// Show cursor (if visible)
+void show_cursor(){
+    // save character under the cursor
     chr_under_csr = slop_character(csr.x,csr.y);
-    if(cursor_visible==false) return;
 
+    // nothing to do if cursor is invisible
+    if(!cursor_visible) {
+        return;
+    }
+
+    // the cursor is actually the reverse of the original character
     unsigned char rvs_chr = chr_under_csr;
     if(rvs_chr>=95){        // yes, 95, our screen codes start at ascii 0x20-0x7f
         rvs_chr -= 95;
@@ -148,10 +159,15 @@ void print_cursor(){
     else{
        rvs_chr += 95; 
     }
-    slip_character(rvs_chr,csr.x,csr.y);
+    store_character(rvs_chr,csr.x,csr.y);
 }
+
+// Restore the character under the cursor
+// (if it was saved)
 void clear_cursor(){
-    slip_character(chr_under_csr,csr.x,csr.y);
+    if (chr_under_csr != 0xFF) {
+        store_character(chr_under_csr,csr.x,csr.y);
+    }
 }
 
 
@@ -464,11 +480,11 @@ print_string("_/_/      _/_/   _/_/_/_/_/   _/_/_/_/_/_/_/   _/_/_/_/_/ _/_/_/_/
 
     // print cursor
     make_cursor_visible(true);
-    print_cursor();  // turns on
+    show_cursor();  // turns on
 }
 
 void print_string(char str[]){
-    for(int i=0;i<strlen(str);i++){
+    for(int i=0; str[i] != '\0'; i++){
         handle_new_character(str[i]);
     }
 }

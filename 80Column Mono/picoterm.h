@@ -29,7 +29,7 @@ unsigned char slop_character(int x,int y);
 unsigned char * slotsForRow(int y);
 void prepare_text_buffer();
 void clear_cursor();
-void print_cursor();
+void show_cursor();
 void handle_new_character(unsigned char ch);
 void print_string(char str[]);
 // for debugging purposes

@@ -34,3 +34,21 @@ USB keyboards are supported via a USB OTG adapter – however, not all keyboards
 Uploading firmware
 
 The Pi Pico uses a UF2 bootloader to appear as a mass storage device so that new firmware can be uploaded to it.  To do this, connect a Micro USB lead between the Pico and your PC/Mac/Laptop/Raspberry Pi/Android Phone.  Then push the BOOTSEL button on the Pico. Whilst holding this down, push and release the RUN button on the VGA board.  (Trust me. This is easier to to than to put in to words!). The Pico will then show up as a drive on your computer.  Simply drag and drop the UF2 firmware on to this drive.  The Pico will automatically reboot and disconnect once this is complete.
+
+**Code cleaning and bug fixing by Daniel Quadros**
+
+- still a work in progress
+- Fixed bugs in prepare\_text\_buffer() and cursor show/clear rotines
+- Serial rotines moved to a separate source, queue rotines redone, uart now uses interrupts for receive
+- removed unused code
+- added comments
+
+Simple testes made connecting uart Tx to Rx (loopback), seems to be working.
+
+Some obvious enhancements to be done
+
+- better keyboard treatment (indicator lights, non-ascci keys)
+- support for pt-br kwyboard layout
+- blinking cursor (?)
+
+
