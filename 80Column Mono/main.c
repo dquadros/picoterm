@@ -10,6 +10,7 @@
  *
  * picoterm.c handles the behaviour of the terminal and storing the text
  * serial.c   handles the UART
+ * keybd.c handles the USB keyboard
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -25,11 +26,12 @@
 #include "main.h"
 #include "picoterm.h"
 #include "serial.h"
+#include "keybd.h"
 
 #define LED             25
 
 // LED control
-enum { LED_ON, LED_OFF, LED_BLINK } led_status;
+static LED_STATUS led_status;
 
 // Video mode
 #define vga_mode vga_mode_640x480_60
@@ -79,13 +81,10 @@ void init_render_state(int core);
 
 // "Tasks" (rotines that will be continuous called in the main loop)
 void led_blinking_task(void);
-void cdc_task(void);
-void hid_app_task(void);
 
 
 // This rotine will continuously render scanlines
 void render_loop() {
-    static uint8_t last_input = 0;
     static uint32_t last_frame_num = 0;
     int core_num = get_core_num();
     assert(core_num >= 0 && core_num < 2);
@@ -215,6 +214,7 @@ int video_main(void) {
     render_loop();          
 #endif
 
+    return 0;
 }
 
 // Beginning of a line
@@ -251,7 +251,6 @@ static __not_in_flash("y") uint16_t end_of_line[] = {
 // this is done by filling the 'dest' structre see scanvidio doc for details 
 bool render_scanline_bg(struct scanvideo_scanline_buffer *dest, int core) {
     uint32_t *buf = dest->data;
-    size_t buf_length = dest->data_max;
     int y = scanvideo_scanline_number(dest->scanline_id);
 
 #undef COUNT
@@ -269,7 +268,6 @@ bool render_scanline_bg(struct scanvideo_scanline_buffer *dest, int core) {
 
     *output32++ = host_safe_hw_ptr(beginning_of_line);
     uint32_t *dbase = font_raw_pixels + FONT_WIDTH_WORDS * (y % FONT_HEIGHT);
-    int cmax = font->dsc->cmaps[0].range_length;
     
     char ch = 0;
 
@@ -330,7 +328,7 @@ void handle_rx() {
 int main(void) {
 
   // initialize the LED
-  led_status = LED_BLINK;
+  setLED (LED_BLINK);
 
   gpio_init(LED);
   gpio_set_dir(LED, GPIO_OUT);
@@ -372,48 +370,10 @@ int main(void) {
 }
 
 
-//--------------------------------------------------------------------+
-// USB CDC
-//--------------------------------------------------------------------+
-#if CFG_TUH_CDC
-CFG_TUSB_MEM_SECTION static char serial_in_buffer[64] = { 0 };
-
-void tuh_mount_cb(uint8_t dev_addr)
-{
-  // application set-up
-  //printf("A device with address %d is mounted\r\n", dev_addr);
-  led_status = LED_OFF;
-  tuh_cdc_receive(dev_addr, serial_in_buffer, sizeof(serial_in_buffer), true); // schedule first transfer
+// Set new LED status
+void setLED(LED_STATUS status) {
+  led_status = status;
 }
-
-void tuh_umount_cb(uint8_t dev_addr)
-{
-  // application tear-down
-  //printf("A device with address %d is unmounted \r\n", dev_addr);
-  led_status = LED_BLINK;
-}
-
-// invoked ISR context
-void tuh_cdc_xfer_isr(uint8_t dev_addr, xfer_result_t event, cdc_pipeid_t pipe_id, uint32_t xferred_bytes)
-{
-  (void) event;
-  (void) pipe_id;
-  (void) xferred_bytes;
-
-  //printf(serial_in_buffer);
-  tu_memclr(serial_in_buffer, sizeof(serial_in_buffer));
-
-  tuh_cdc_receive(dev_addr, serial_in_buffer, sizeof(serial_in_buffer), true); // waiting for next data
-}
-
-void cdc_task(void)
-{
-
-}
-
-#endif
-
-
 
 //--------------------------------------------------------------------+
 // LED Blinking Task
@@ -448,238 +408,6 @@ void led_blinking_task(void)
     break;
   }
 
-
-}
-
-
-
-
-
-
-//--------------------------------------------------------------------+
-// hid_app.c
-//--------------------------------------------------------------------+
-
-
-
-
-//--------------------------------------------------------------------+
-// MACRO TYPEDEF CONSTANT ENUM DECLARATION
-//--------------------------------------------------------------------+
-
-// If your host terminal support ansi escape code, it can be use to simulate mouse cursor
-#define USE_ANSI_ESCAPE   0
-
-#define MAX_REPORT  4
-
-
-static uint8_t const keycode2ascii[128][2] =  { HID_KEYCODE_TO_ASCII };
-
-// Each HID instance can has multiple reports
-static uint8_t _report_count[CFG_TUH_HID];
-static tuh_hid_report_info_t _report_info_arr[CFG_TUH_HID][MAX_REPORT];
-
-static void process_kbd_report(hid_keyboard_report_t const *report);
-static void process_mouse_report(hid_mouse_report_t const * report);
-
-void hid_app_task(void)
-{
-  // nothing to do
-}
-
-//--------------------------------------------------------------------+
-// TinyUSB Callbacks
-//--------------------------------------------------------------------+
-
-// Invoked when device with hid interface is mounted
-// Report descriptor is also available for use. tuh_hid_parse_report_descriptor()
-// can be used to parse common/simple enough descriptor.
-void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len)
-{
-  //char msg[200];
-  //printf("HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
-  //sprintf(msg, "HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
-  //print_string(msg);
-
-  // Interface protocol
-  const char* protocol_str[] = { "None", "Keyboard", "Mouse" }; // hid_protocol_type_t
-  uint8_t const interface_protocol = tuh_hid_interface_protocol(dev_addr, instance);
-
-  // Parse report descriptor with built-in parser
-  _report_count[instance] = tuh_hid_parse_report_descriptor(_report_info_arr[instance], MAX_REPORT, desc_report, desc_len);
-  //printf("HID has %u reports and interface protocol = %s\r\n", _report_count[instance], protocol_str[interface_protocol]);
-  //sprintf(msg, "HID has %u reports and interface protocol = %s\r\n", _report_count[instance], protocol_str[interface_protocol]);
-  //print_string(msg);
-}
-
-// Invoked when device with hid interface is un-mounted
-void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
-{
-  //printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
-}
-
-// Invoked when received report from device via interrupt endpoint
-void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len)
-{
-  (void) dev_addr;
-
-  uint8_t const rpt_count = _report_count[instance];
-  tuh_hid_report_info_t* rpt_info_arr = _report_info_arr[instance];
-  tuh_hid_report_info_t* rpt_info = NULL;
-
-  if ( rpt_count == 1 && rpt_info_arr[0].report_id == 0)
-  {
-    // Simple report without report ID as 1st byte
-    rpt_info = &rpt_info_arr[0];
-  }else
-  {
-    // Composite report, 1st byte is report ID, data starts from 2nd byte
-    uint8_t const rpt_id = report[0];
-
-    // Find report id in the arrray
-    for(uint8_t i=0; i<rpt_count; i++)
-    {
-      if (rpt_id == rpt_info_arr[i].report_id )
-      {
-        rpt_info = &rpt_info_arr[i];
-        break;
-      }
-    }
-
-    report++;
-    len--;
-  }
-
-  if (!rpt_info)
-  {
-    //printf("Couldn't find the report info for this report !\r\n");
-    return;
-  }
-
-  if ( rpt_info->usage_page == HID_USAGE_PAGE_DESKTOP )
-  {
-    switch (rpt_info->usage)
-    {
-      case HID_USAGE_DESKTOP_KEYBOARD:
-        TU_LOG1("HID receive keyboard report\r\n");
-        // Assume keyboard follow boot report layout
-        process_kbd_report( (hid_keyboard_report_t const*) report );
-      break;
-
-      case HID_USAGE_DESKTOP_MOUSE:
-        TU_LOG1("HID receive mouse report\r\n");
-        // Assume mouse follow boot report layout
-        process_mouse_report( (hid_mouse_report_t const*) report );
-      break;
-
-      default: break;
-    }
-  }
-}
-
-//--------------------------------------------------------------------+
-// Keyboard
-//--------------------------------------------------------------------+
-
-// look up new key in previous keys
-static inline bool find_key_in_report(hid_keyboard_report_t const *report, uint8_t keycode)
-{
-  for(uint8_t i=0; i<6; i++)
-  {
-    if (report->keycode[i] == keycode)  return true;
-  }
-
-  return false;
-}
-
-
-static bool capslock_key_down_in_last_report = false;
-static bool capslock_key_down_in_this_report = false;
-static bool capslock_on = false;
-
-static void process_kbd_report(hid_keyboard_report_t const *report)
-{
-  static hid_keyboard_report_t prev_report = { 0, 0, {0} }; // previous report to check key released
-
-  capslock_key_down_in_this_report = false;
-  for(uint8_t i=0; i<6; i++){
-    if ( find_key_in_report(report, HID_KEY_CAPS_LOCK)){
-      capslock_key_down_in_this_report = true;
-    }
-  }
-
-  if(capslock_key_down_in_this_report==true && capslock_key_down_in_last_report==false){
-      // toggle the value
-      capslock_on = !capslock_on;
-  }
-
-  //------------- example code ignore control (non-printable) key affects -------------//
-  for(uint8_t i=0; i<6; i++)
-  {
-    if ( report->keycode[i] )
-    {
-      if ( find_key_in_report(&prev_report, report->keycode[i]) )
-      {
-        // exist in previous report means the current key is holding
-      }else
-      {
-        // not existed in previous report means the current key is pressed
-
-        bool const is_ctrl =  report->modifier & (KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_RIGHTCTRL);
-        bool const is_shift =  report->modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT);
-        uint8_t ch = keycode2ascii[report->keycode[i]][is_shift ? 1 : 0];
-
-        //char msg[100];
-        //sprintf(msg, "key=%c(%02X) ", ch, ch);
-        //print_string(msg);
-        
-        if(report->keycode[i]!=HID_KEY_CAPS_LOCK){
-          if(is_ctrl && ch>95){
-            put_tx(ch-96);
-            //put_rx(ch-96);
-            //uart_putc (UART_ID, ch-96);
-          }
-          else if(capslock_on && ch>96 && ch<123){
-            put_tx(ch-32);
-            //put_rx(ch-32);
-            //uart_putc (UART_ID, ch-32);
-          } 
-          else{
-            put_tx(ch);
-            //put_rx(ch);
-            //uart_putc (UART_ID, ch);
-          }
-        }
-
-
-        /*
-        putchar(ch);
-        if ( ch == '\r' ) putchar('\n'); // added new line for enter key
-        fflush(stdout); // flush right away, else nanolib will wait for newline
-      */
-      
-      
-      
-      }
-    }
-    // TODO example skips key released
-  }
-
-  prev_report = *report;
-  capslock_key_down_in_last_report = capslock_key_down_in_this_report;
-}
-
-//--------------------------------------------------------------------+
-// Mouse
-//--------------------------------------------------------------------+
-
-void cursor_movement(int8_t x, int8_t y, int8_t wheel)
-{
-
-}
-
-static void process_mouse_report(hid_mouse_report_t const * report)
-{
 
 }
 

@@ -37,18 +37,20 @@ The Pi Pico uses a UF2 bootloader to appear as a mass storage device so that new
 
 **Code cleaning and bug fixing by Daniel Quadros**
 
+- only for 80 column mono
 - still a work in progress
-- Fixed bugs in prepare\_text\_buffer() and cursor show/clear rotines
+- fixed bugs in prepare\_text\_buffer() and cursor show/clear rotines
 - Serial rotines moved to a separate source, queue rotines redone, uart now uses interrupts for receive
+- USB keyboard moved to a separate source, caps lock fixed, implemented capslock led
+- support for diferent keyboard layouts from Birko Bergt, pt-br layout added
 - removed unused code
 - added comments
 
-Simple testes made connecting uart Tx to Rx (loopback), seems to be working.
+Simple testes made connecting uart Tx to Rx (loopback). Seems to be working, but some instabilities apparently related to keyboard.
 
 Some obvious enhancements to be done
 
-- better keyboard treatment (indicator lights, non-ascci keys)
-- support for pt-br kwyboard layout
+- support for cursor keys, etc
 - blinking cursor (?)
 
 

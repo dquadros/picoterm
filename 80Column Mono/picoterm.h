@@ -5,6 +5,8 @@
  *
  * main.c handles the ins and outs
  * picoterm.c handles the behaviour of the terminal and storing the text
+ * serial.c   handles the UART
+ * keybd.c handles the USB keyboard
  *
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR

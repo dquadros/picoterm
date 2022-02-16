@@ -16,15 +16,6 @@
  *
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdbool.h>
-
-#include "pico.h"
-#include "pico/stdlib.h"
-#include "hardware/uart.h"
-#include "hardware/irq.h"
-
 #include "serial.h"
 
 // Rx buffer (i.e., data from the RC2014)

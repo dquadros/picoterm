@@ -35,7 +35,15 @@
 #include "bsp/board.h"
 #include "tusb.h"
 
+#ifndef _MAIN_H
 
+#define _MAIN_H
+
+typedef enum { LED_ON, LED_OFF, LED_BLINK } LED_STATUS;
+
+void setLED(LED_STATUS status);
+
+#endif
 
 // #include "tusb_config.h"
 
